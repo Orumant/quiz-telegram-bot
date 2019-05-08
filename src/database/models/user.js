@@ -15,6 +15,7 @@ const userSchema = new mongoose.Schema({
       category: String
     }
   ],
+  stack: String,
   status: String
 });
 

@@ -27,6 +27,7 @@ const statuses = [
 function generateUser(options = {}) {
   return Object.assign(
     {
+      stack: '',
       answers: [],
       status: statuses[0]
     },

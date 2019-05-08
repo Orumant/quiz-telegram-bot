@@ -1,11 +1,13 @@
+const {generateMessage} = require("./messages");
 const TelegramBot = require("node-telegram-bot-api");
 const config = require("config");
 const { isTestAvailableByTime } = require("./game/dateutils");
 const TOKEN = config.get("telegramBotToken");
+const IS_MOBIUS = config.get("isMobius");
 const url = config.get("url");
 const bot_server = config.get("bot_server");
 const { port, key, cert } = bot_server;
-
+const R = require("ramda");
 const options = {
   webHook: {
     port,
@@ -14,11 +16,11 @@ const options = {
   }
 };
 
-// const bot = new TelegramBot(TOKEN, { polling: true });
-const bot = new TelegramBot(TOKEN, options);
-bot.setWebHook(`${url}/bot${TOKEN}`, {
-  certificate: options.webHook.cert
-});
+const bot = new TelegramBot(TOKEN, { polling: true });
+// const bot = new TelegramBot(TOKEN, options);
+// bot.setWebHook(`${url}/bot${TOKEN}`, {
+//   certificate: options.webHook.cert
+// });
 
 const logger = require("./logger");
 
@@ -58,7 +60,21 @@ bot.onText(/\/start/, incomeMsg => {
     checkForExistingUser(incomeMsg)
       .then(handleStartForAlreadyExistsGamer)
       .catch(_ => startQuiz(incomeMsg))
-      .then(({ id, msg, opts }) => sendMessage(id, msg, opts))
+      .then(({ id, msg, opts }) => {
+        if (IS_MOBIUS) {
+          let message = generateMessage({
+            id,
+            msg: "Разработчиком для какой платформы вы являетесь",
+            replies: [{id: 1, value: "Я разработчик iOS"}, {id: 2, value: "Я разработчик Android"}]
+          });
+          R.compose(
+            sendMessageFromQueue({id, msg, opts}),
+            sendMessageFromQueue(message)
+          );
+        } else {
+          sendMessageFromQueue({id, msg, opts});
+        }
+      })
       .catch(({ id, msg }) => sendMessage(id, msg));
   } else {
     const { chat: { id } } = incomeMsg;

@@ -18,7 +18,7 @@ module.exports = {
     key: `${__dirname}/../../certs/webhook_pkey.pem`,
     cert: `${__dirname}/../../certs/webhook_cert.pem`
   },
-
+  isMobius: true,
   api_server: {
     logDest: `${process.cwd()}/logs/api`,
     port: process.env.PORT || 3000
