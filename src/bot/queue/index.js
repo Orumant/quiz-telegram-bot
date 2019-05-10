@@ -45,11 +45,11 @@ module.exports = class Queue {
 
   handleTick() {
     const batchMessages = this.getMessagesBatch();
-    logger.warn(
-      "Tick the queue, messages count=%s, batch size=%s",
-      this.messages.size,
-      batchMessages.length
-    );
+    // logger.warn(
+    //   "Tick the queue, messages count=%s, batch size=%s",
+    //   this.messages.size,
+    //   batchMessages.length
+    // );
     batchMessages.map(message => {
       this.callbacks.forEach(callback => callback(message));
       this.messages.delete(message);

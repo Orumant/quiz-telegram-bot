@@ -28,15 +28,15 @@ function getQuestion(questionnaires = [], categories = [], gamer = {}) {
   //Вопросы, на которые пользователь ответил
   const answered = questionnairesByAnswered(questionnaires, answers);
 
-  //количество ответов по категориям
+  //количество вопросов в категории
   const countFromAnsweredMap = countOfAnswersByCategoryMap(answered);
-
+  //количество вопросов на которые нужно ответить в категории
   const countOfNeedsMap = countOfNeedsAnswersByCategoryMap(categories);
 
   let sumAnswersFromMap = R.compose(R.sum, Array.from);
-
+  //количество вопросов, на которые нужно ответить чтобы пройти тестирование
   let sumOfNeedsAnswers = sumAnswersFromMap(countOfNeedsMap.values());
-
+  //количество вопросов
   let sumOfAnswered = sumAnswersFromMap(countFromAnsweredMap.values());
 
   if (sumOfAnswered >= sumOfNeedsAnswers) {

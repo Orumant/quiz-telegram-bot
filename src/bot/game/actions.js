@@ -2,7 +2,7 @@ const {isTestAvailableByTime} = require("./dateutils");
 const R = require("ramda");
 const {makeGamerAnswer, alreadyAnswered} = require("../user/answers");
 const {getQuestion} = require("../questionnaires");
-const {WITH_QUESTIONS_STATUS, FINISH_STATUS} = require("../user");
+const {WITH_QUESTIONS_STATUS, NEW_STATUS, WAIT_STACK, WITH_STACK, WAIT_NAME, WITH_NAME, FINISH_STATUS} = require("../user");
 const logger = require("../logger");
 const IOS = 'ios';
 const ANDROID = 'android';
@@ -30,8 +30,8 @@ const {
 } = require("../user");
 const compareAnswer = require("../compare-answer");
 
-const { parseMsg } = require("../messages/parsers");
-const { generateOpts, generateMessage } = require("../messages");
+const {parseMsg} = require("../messages/parsers");
+const {generateOpts, generateMessage} = require("../messages");
 
 const {
   processNoQuestionnaireForGamer,
@@ -41,7 +41,7 @@ const {
   generatePayload
 } = require("./pipes");
 
-const { countCorrectAnswers } = require("./helpers");
+const {countCorrectAnswers} = require("./helpers");
 const config = require("config");
 const SIMPLE_PRIZE_SCORE = config.get("bot.simple_prize_score");
 const IS_MOBIUS = config.get("isMobius");
@@ -58,11 +58,15 @@ module.exports = {
   processHasQuestionnaireForGamer,
   clearUserProfile,
   stopEmptyMessage,
-  handleStartForAlreadyExistsGamer
+  processUserData,
+  handleStartForAlreadyExistsGamer,
+  processUsersWithNoInfo,
+  queryData,
+  processUserBadgeName,
 };
 
 function destroyUserProfile(msg) {
-  const { userId, telegramId, name } = parseMsg(msg);
+  const {userId, telegramId, name} = parseMsg(msg);
 
   return new Promise(resolve =>
     deleteUser(userId)
@@ -84,7 +88,7 @@ function destroyUserProfile(msg) {
 }
 
 function clearUserProfile(msg) {
-  const { telegramId } = parseMsg(msg);
+  const {telegramId} = parseMsg(msg);
 
   return new Promise((resolve, reject) =>
     getUserById(telegramId)
@@ -114,7 +118,7 @@ function clearUserProfile(msg) {
 }
 
 function checkForExistingUser(msg) {
-  const { userId, telegramId } = parseMsg(msg);
+  const {userId, telegramId} = parseMsg(msg);
   return new Promise((resolve, reject) =>
     getUserById(userId)
       .then(user => {
@@ -138,123 +142,103 @@ function checkForExistingUser(msg) {
 }
 
 function handleUserAnswer(user, msg) {
-  const { telegramId } = parseMsg(msg);
+  const {telegramId} = parseMsg(msg);
   return new Promise((resolve, reject) => {
     const answer = msg.text;
     const questionId = answer.match(/(\w+)--/)[1];
     const answerIndex = answer.match(/--(\d+)/)[1];
 
-    if (IS_MOBIUS && R.equals(user.stack, "")) {
-      user.stack = STACK[answerIndex - 1];
+    if (alreadyAnswered(user, questionId)) {
+      return resolve();
+    }
+
+    if (user.status === "with-question") {
+      logger.info("Gamer %s, answer: %s", telegramId, msg);
       setNextStatus(user);
-      let message = {};
-      updateUser(user)
-        .then(_ => {
-          message = {
-            id: telegramId,
-            msg: `Спасибо! Вопросы по выбранному вами стеку будут присланы через некоторое время автоматически.`
-          };
-          resolve(message);
+      const checkedQuestionId = R.compose(
+        R.find(R.equals(questionId)),
+        R.map(R.toString),
+        R.pluck("questionnaireId")
+      )(user.answers);
+
+      Question.findById(checkedQuestionId)
+        .then(questionnaire => {
+          const isCorrect = compareAnswer(questionnaire, answerIndex);
+          const newAnswer = makeGamerAnswer(
+            questionnaire,
+            answerIndex,
+            isCorrect
+          );
+          logger.info(
+            "Gamer %s, isCorrect=%s, newAnswer=%s",
+            telegramId,
+            isCorrect,
+            newAnswer
+          );
+          // Так как не обновляется значение объекта в массиве, приходится делать это отдельно
+          // Далее пользователь обновляется для изменения статуса
+          updateUserAnswer(user._id, newAnswer)
+            .then(_ => {
+              updateUser(user)
+                .then(updatedUser => {
+                  logger.info(
+                    "Gamer %s updated to %s",
+                    telegramId,
+                    updatedUser
+                  );
+                  const {answers = []} = user;
+                  //Чтобы не вычитывать пользователя из БД и т.к. в user.answers на данном этапе хранится на один вопрос
+                  //меньше, чем реально отвечено, а ответ на последний вопрос находится в newAnswer в isCorrect, то добавляем доп. проверку
+                  const score =
+                    countCorrectAnswers(answers) + (isCorrect ? 1 : 0);
+                  let scoreMsg = "";
+                  if (score == SIMPLE_PRIZE_SCORE && isCorrect) {
+                    scoreMsg +=
+                      "\n\nВы набрали балл, достаточный для получения подарка. Покажите это сообщение сотрудникам на стойке Сбертеха и получите его.\nПродолжайте участвовать и вы сможете получить более крутые призы!";
+                  }
+                  if (isTestAvailableByTime()) {
+                    resolve({
+                      id: telegramId,
+                      msg: `Ответ принят, спасибо! Следующее обновление придет автоматически.${scoreMsg}`
+                    });
+                  } else {
+                    resolve({
+                      id: telegramId,
+                      msg: `Ответ принят, спасибо!.\nК сожалению, бот активен только во время конференции, сейчас он недоступен.${scoreMsg}`
+                    });
+                  }
+                })
+                .catch(err => {
+                  logger.info(err);
+                  reject({
+                    id: telegramId,
+                    msg:
+                      "Произошла ошибка. Обратитесь на стойку к сотрудникам Сбертеха."
+                  });
+                });
+            })
+            .catch(err => {
+              logger.error(err);
+              reject({
+                id: telegramId,
+                msg:
+                  "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбертеха."
+              });
+            });
         })
         .catch(err => {
-          message = {
+          logger.error(err);
+          reject({
             id: telegramId,
-            msg: `ERROR`
-          };
-          reject(message);
-        })
-    } else {
-      if (alreadyAnswered(user, questionId)) {
-        return resolve();
-      }
-      if (user.status === "with-question") {
-        logger.info("Gamer %s, answer: %s", telegramId, msg);
-        setNextStatus(user);
-        const checkedQuestionId = R.compose(
-          R.find(R.equals(questionId)),
-          R.map(R.toString),
-          R.pluck("questionnaireId")
-        )(user.answers);
-
-        Question.findById(checkedQuestionId)
-          .then(questionnaire => {
-            const isCorrect = compareAnswer(questionnaire, answerIndex);
-            const newAnswer = makeGamerAnswer(
-              questionnaire,
-              answerIndex,
-              isCorrect
-            );
-            logger.info(
-              "Gamer %s, isCorrect=%s, newAnswer=%s",
-              telegramId,
-              isCorrect,
-              newAnswer
-            );
-            // Так как не обновляется значение объекта в массиве, приходится делать это отдельно
-            // Далее пользователь обновляется для изменения статуса
-            updateUserAnswer(user._id, newAnswer)
-              .then(_ => {
-                updateUser(user)
-                  .then(updatedUser => {
-                    logger.info(
-                      "Gamer %s updated to %s",
-                      telegramId,
-                      updatedUser
-                    );
-                    const {answers = []} = user;
-                    //Чтобы не вычитывать пользователя из БД и т.к. в user.answers на данном этапе хранится на один вопрос
-                    //меньше, чем реально отвечено, а ответ на последний вопрос находится в newAnswer в isCorrect, то добавляем доп. проверку
-                    const score =
-                      countCorrectAnswers(answers) + (isCorrect ? 1 : 0);
-                    let scoreMsg = "";
-                    if (score == SIMPLE_PRIZE_SCORE && isCorrect) {
-                      scoreMsg +=
-                        "\n\nВы набрали балл, достаточный для получения подарка. Покажите это сообщение сотрудникам на стойке Сбертеха и получите его.\nПродолжайте участвовать и вы сможете получить более крутые призы!";
-                    }
-                    if (isTestAvailableByTime()) {
-                      resolve({
-                        id: telegramId,
-                        msg: `Ответ принят, спасибо! Следующее обновление придет автоматически.${scoreMsg}`
-                      });
-                    } else {
-                      resolve({
-                        id: telegramId,
-                        msg: `Ответ принят, спасибо!.\nК сожалению, бот активен только во время конференции, сейчас он недоступен.${scoreMsg}`
-                      });
-                    }
-                  })
-                  .catch(err => {
-                    logger.info(err);
-                    reject({
-                      id: telegramId,
-                      msg:
-                        "Произошла ошибка. Обратитесь на стойку к сотрудникам Сбертеха."
-                    });
-                  });
-              })
-              .catch(err => {
-                logger.error(err);
-                reject({
-                  id: telegramId,
-                  msg:
-                    "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбертеха."
-                });
-              });
-          })
-          .catch(err => {
-            logger.error(err);
-            reject({
-              id: telegramId,
-              msg: "Произошла ошибка. Обратитесь на стойку к hr."
-            });
+            msg: "Произошла ошибка. Обратитесь на стойку к hr."
           });
-      }
+        });
     }
   });
 }
 
 function startQuiz(msg) {
-  const { telegramId, userId, username, name, fio } = parseMsg(msg);
+  const {telegramId, userId, username, name, fio} = parseMsg(msg);
   return new Promise((resolve, reject) => {
     const newUser = generateUser({
       telegramId: telegramId,
@@ -282,6 +266,68 @@ function startQuiz(msg) {
   });
 }
 
+function queryData() {
+  return Promise.all([
+    getAllUsers(),
+    getAllQuestionnaires(),
+    getAllCategories()
+  ])
+    .then(R.zipObj(["gamers", "questionnaires", "categories"]))
+}
+
+function processUsersWithNoInfo(data) {
+  const {gamers} = data;
+  const {renderStackQuestion} = require('../messages');
+  return new Promise((resolve, reject) => {
+    let unknownGamers = gamers.filter(gamer =>
+      [NEW_STATUS,WAIT_NAME,WITH_NAME,WITH_STACK, WAIT_STACK].includes(gamer.status));
+    let messages = unknownGamers.map(async gamer => {
+      let {id, badgeName, status, stack} = gamer;
+      let message = null;
+      if (!badgeName && status === NEW_STATUS) {
+        setNextStatus(gamer);
+        message = await updateUser(gamer)
+          .then(() => {
+            return {
+              id,
+              msg: 'Как к Вам обращаться? Пожалуйста, укажите имя, которое написано у Вас на бэйдже.'
+            }
+          })
+          .catch(err => {
+            logger.error(err);
+            return {
+              id,
+              msg: 'Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.'
+            }
+          });
+      } else {
+        if (IS_MOBIUS && stack === "" && status === WITH_NAME) {
+          setNextStatus(gamer);
+          message = await updateUser(gamer)
+            .then(() => renderStackQuestion(id))
+            .catch(err => ({
+              id,
+              msg: 'Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.'
+            }));
+        } else {
+          if(status === WITH_STACK || (!IS_MOBIUS && ([WITH_NAME,WAIT_STACK].includes(status)))){
+            setNextStatus(gamer);
+            message = await updateUser(gamer)
+              .catch(err => ({
+                id,
+                msg: 'Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.'
+              }));
+          }
+        }
+      }
+      return message;
+    });
+    Promise.all(messages)
+      .then(resolvedMessages => removeEmptyMessages(resolvedMessages))
+      .then(msg => resolve(msg))
+  })
+}
+
 function getQuestinnairesForWaitingGamers() {
   return Promise.all([
     getAllUsers(),
@@ -294,7 +340,7 @@ function getQuestinnairesForWaitingGamers() {
         gamers: filterWaitingUsers(result.gamers)
       });
     })
-    .then(({ gamers = [], questionnaires = [], categories = [] }) => {
+    .then(({gamers = [], questionnaires = [], categories = []}) => {
       return Promise.all(
         gamers.map(gamer =>
           getQuestionnaireForGamer(gamer, questionnaires, categories)
@@ -363,4 +409,61 @@ function stopEmptyMessage(message = {}) {
   }
   logger.info("Gamer twice answer on questionnaire");
   throw new Error("Gamer twice answer on questionnaire");
+}
+
+function processUserBadgeName(user, msg) {
+  const {telegramId} = parseMsg(msg);
+  return new Promise((resolve, reject) => {
+    const answer = msg.text;
+
+    if (user.badgeName == null && user.status === WAIT_NAME) {
+      console.log(answer);
+      user.badgeName = answer;
+      updateUser(setNextStatus(user))
+        .then(_ => {
+          resolve({
+            id: telegramId,
+            msg: `Здравствуйте, ${answer}!`
+          })
+        })
+        .catch(err => {
+          logger.error(err);
+          reject({
+            id: telegramId,
+            msg: `Произошла ошибка! Обратитесь на стойку Сбербанка.`
+          })
+        })
+    }
+  })
+}
+
+function processUserData(user, msg) {
+  const {telegramId} = parseMsg(msg);
+  return new Promise((resolve, reject) => {
+    const answer = msg.text;
+
+    if (IS_MOBIUS && R.equals(user.stack, "") && user.status === WAIT_STACK) {
+      const answerIndex = answer.match(/--(\d+)/)[1];
+      user.stack = STACK[answerIndex - 1];
+      setNextStatus(user);
+      let message = {};
+      updateUser(user)
+        .then(_ => {
+          message = {
+            id: telegramId,
+            msg: `Спасибо! Вопросы по выбранному вами стеку будут присланы через некоторое время автоматически.`
+          };
+          resolve(message);
+        })
+        .catch(err => {
+          message = {
+            id: telegramId,
+            msg: `ERROR`
+          };
+          reject(message);
+        })
+    } else {
+      handleUserAnswer(user, msg);
+    }
+  });
 }

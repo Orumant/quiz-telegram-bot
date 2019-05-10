@@ -4,6 +4,7 @@ module.exports = {
   generateOpts,
   renderHelp,
   generateMessage,
+  renderStackQuestion,
   MAX_BUTTON_TEXT_SIZE
 };
 
@@ -86,6 +87,17 @@ function generateMessage({ id, msg, replies = [] }) {
     msg: question,
     opts: generateOpts({ replies: repliesForKeyboard })
   };
+}
+
+function renderStackQuestion(id) {
+  return generateMessage({
+    id,
+    msg: "Разработчиком для какой платформы вы являетесь",
+    replies: [
+      {id: 1, value: "Я разработчик iOS"},
+      {id: 2, value: "Я разработчик Android"}
+      ]
+  });
 }
 
 function renderHelp() {
