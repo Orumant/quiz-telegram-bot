@@ -6,6 +6,8 @@ const { makeGamerAnswer } = require("../user/answers");
 const { countCorrectAnswers } = require("./helpers");
 const config = require("config");
 const LOTTERY_SCORE = config.get("bot.lottery_score");
+const SF_LINK = config.get("bot.sf_link");
+const MAX_TRY = config.get("bot.max_try");
 
 module.exports = {
   processNoQuestionnaireForGamer,
@@ -15,21 +17,34 @@ module.exports = {
   generatePayload: processNewPayload
 };
 
+const {bot} = require('../index');
+
 function processNoQuestionnaireForGamer(questionnaire = {}) {
+  // payload = {gamer, message}
   return payload => {
     const { gamer = {} } = payload;
     if (!questionnaire) {
-      const { answers = [] } = gamer;
+      const { answers = [], tryCount } = gamer;
       const score = countCorrectAnswers(answers);
-      let scoreMsg = `Ваш итоговый балл ${score}. `;
+      let scoreMsg = `Ваш итоговый балл ${score}/${answers.length}. `;
       if (score >= LOTTERY_SCORE) {
         scoreMsg +=
-          "И набрали балл, достаточный для участия в розыгрыше суперпризов. Теперь вы можете обратиться к сотрудникам Сбербанк-Технологии на стенде для получения информации об условиях розыгрыша призов";
+          `Поздравляю! Вы набрали достаточный балл для получения достижения! Ура!\nПожалуйста, заполните анкету по ссылке ${SF_LINK}, затем, получите наклейку на стойке Сбербанка\nСпасибо за участие! `;
+        bot.sendMessage("-1001400387801", `УСПЕХ! ${gamer.badgeName}(${gamer.username}) завершил тест с результатом: ${score}/${answers.length}.\nКоличество попыток: ${gamer.tryCount}`)
+      } else {
+        if (MAX_TRY > tryCount) {
+          scoreMsg += `К сожалению, вы набрали не достаточно правильных ответов для получения достижения
+Вы можете попробовать пройти тестирование еще раз! 
+Количество оставшихся попыток: ${MAX_TRY - tryCount}.
+Для этого отправьте команду /clear`
+        } else {
+          scoreMsg += `Спасибо за участие!`
+        }
       }
       return Object.assign(payload, {
         message: {
           id: gamer.telegramId,
-          msg: `Вы ответили на все вопросы.\n${scoreMsg}\n\nСпасибо за участие.`
+          msg: `${scoreMsg}`
         },
         gamer: Object.assign(gamer, {
           status: FINISH_STATUS
@@ -41,6 +56,7 @@ function processNoQuestionnaireForGamer(questionnaire = {}) {
 }
 
 function processHasQuestionnaireForGamer(questionnaire = { options: [] }) {
+  //payload = {gamer, massage}
   return payload => {
     const { gamer = { answers: [] }, message = {} } = payload;
     if (questionnaire) {

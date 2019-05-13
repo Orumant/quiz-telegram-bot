@@ -96,22 +96,29 @@ function clearUserProfile(msg) {
         if (!user || !user.length) {
           reject();
         }
-        const clearedUser = clearUser(user[0]);
-        return updateUser(clearedUser)
-          .then(
-            resolve({
-              id: telegramId,
-              msg:
-                "История ваших ответов очищена. Тестирование начнется сначала. Обновление придет автоматически"
-            })
-          )
-          .catch(reject);
+        if (user[0].tryCount === 3) {
+          return reject({
+            id: telegramId,
+            msg: 'Увы, вы исчерпали все попытки.'
+          })
+        } else {
+          const clearedUser = clearUser(user[0]);
+          return updateUser(clearedUser)
+            .then(
+              resolve({
+                id: telegramId,
+                msg:
+                  "Тестирование начнется сначала. Обновление придет автоматически"
+              })
+            )
+            .catch(reject);
+        }
       })
       .catch(err => {
         console.log(err);
         return reject({
           id: telegramId,
-          msg: `Произошла ошибка при поиске вашего профиля.\nПожалуйста, очистите профиль /clear.\nИ после этого анкетирование перезапустится автоматически.`
+          msg: `Произошла ошибка при поиске вашего профиля.\nПожалуйста, обратитесь на стойку Сбербанка.`
         });
       })
   );
@@ -191,20 +198,20 @@ function handleUserAnswer(user, msg) {
                   //меньше, чем реально отвечено, а ответ на последний вопрос находится в newAnswer в isCorrect, то добавляем доп. проверку
                   const score =
                     countCorrectAnswers(answers) + (isCorrect ? 1 : 0);
-                  let scoreMsg = "";
-                  if (score == SIMPLE_PRIZE_SCORE && isCorrect) {
-                    scoreMsg +=
-                      "\n\nВы набрали балл, достаточный для получения подарка. Покажите это сообщение сотрудникам на стойке Сбертеха и получите его.\nПродолжайте участвовать и вы сможете получить более крутые призы!";
-                  }
+                  let scoreMsg = ``;
+                  // if (score == SIMPLE_PRIZE_SCORE && isCorrect) {
+                  //   scoreMsg +=
+                  //     "\n\nВы набрали балл, достаточный для получения подарка. Покажите это сообщение сотрудникам на стойке Сбертеха и получите его.\nПродолжайте участвовать и вы сможете получить более крутые призы!";
+                  // }
                   if (isTestAvailableByTime()) {
                     resolve({
                       id: telegramId,
-                      msg: `Ответ принят, спасибо! Следующее обновление придет автоматически.${scoreMsg}`
+                      msg: `Ответ принят, спасибо! Следующее обновление придет автоматически.`
                     });
                   } else {
                     resolve({
                       id: telegramId,
-                      msg: `Ответ принят, спасибо!.\nК сожалению, бот активен только во время конференции, сейчас он недоступен.${scoreMsg}`
+                      msg: `Ответ принят, спасибо!.\nК сожалению, бот активен только во время конференции, сейчас он недоступен.`
                     });
                   }
                 })
@@ -213,7 +220,7 @@ function handleUserAnswer(user, msg) {
                   reject({
                     id: telegramId,
                     msg:
-                      "Произошла ошибка. Обратитесь на стойку к сотрудникам Сбертеха."
+                      "Произошла ошибка. Обратитесь на стойку к сотрудникам Сбербанка."
                   });
                 });
             })
@@ -222,7 +229,7 @@ function handleUserAnswer(user, msg) {
               reject({
                 id: telegramId,
                 msg:
-                  "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбертеха."
+                  "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбербанка."
               });
             });
         })
@@ -230,7 +237,7 @@ function handleUserAnswer(user, msg) {
           logger.error(err);
           reject({
             id: telegramId,
-            msg: "Произошла ошибка. Обратитесь на стойку к hr."
+            msg: "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбербанк."
           });
         });
     }
@@ -280,47 +287,41 @@ function processUsersWithNoInfo(data) {
   const {renderStackQuestion} = require('../messages');
   return new Promise((resolve, reject) => {
     let unknownGamers = gamers.filter(gamer =>
-      [NEW_STATUS,WAIT_NAME,WITH_NAME,WITH_STACK, WAIT_STACK].includes(gamer.status));
+      [NEW_STATUS, WAIT_NAME, WITH_NAME, WITH_STACK, WAIT_STACK].includes(gamer.status));
     let messages = unknownGamers.map(async gamer => {
       let {id, badgeName, status, stack} = gamer;
       let message = null;
       if (!badgeName && status === NEW_STATUS) {
         setNextStatus(gamer);
-        message = await updateUser(gamer)
-          .then(() => {
-            return {
-              id,
-              msg: 'Как к Вам обращаться? Пожалуйста, укажите имя, которое написано у Вас на бэйдже.'
-            }
-          })
-          .catch(err => {
-            logger.error(err);
-            return {
-              id,
-              msg: 'Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.'
-            }
-          });
+        message = {
+          id,
+          msg: 'Как к Вам обращаться? Пожалуйста, укажите имя, которое написано у Вас на бэйдже.'
+        };
       } else {
         if (IS_MOBIUS && stack === "" && status === WITH_NAME) {
           setNextStatus(gamer);
-          message = await updateUser(gamer)
-            .then(() => renderStackQuestion(id))
-            .catch(err => ({
-              id,
-              msg: 'Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.'
-            }));
+          message = renderStackQuestion(id);
         } else {
-          if(status === WITH_STACK || (!IS_MOBIUS && ([WITH_NAME,WAIT_STACK].includes(status)))){
+          if (status === WITH_STACK || (!IS_MOBIUS && ([WITH_NAME, WAIT_STACK].includes(status)))) {
             setNextStatus(gamer);
-            message = await updateUser(gamer)
-              .catch(err => ({
+            if(status === WITH_STACK) {
+              message = {
                 id,
-                msg: 'Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.'
-              }));
+                msg: 'Спасибо! В скором времени вам будет отправлен первый вопрос.'
+              }
+            }
           }
         }
       }
-      return message;
+      return updateUser(gamer)
+        .then(() => message)
+        .catch(err => {
+          logger.error(err);
+          return {
+            id,
+            msg: 'Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.'
+          }
+        })
     });
     Promise.all(messages)
       .then(resolvedMessages => removeEmptyMessages(resolvedMessages))
@@ -328,13 +329,8 @@ function processUsersWithNoInfo(data) {
   })
 }
 
-function getQuestinnairesForWaitingGamers() {
-  return Promise.all([
-    getAllUsers(),
-    getAllQuestionnaires(),
-    getAllCategories()
-  ])
-    .then(R.zipObj(["gamers", "questionnaires", "categories"]))
+function getQuestinnairesForWaitingGamers(data) {
+  return Promise.resolve(data)
     .then(result => {
       return Object.assign(result, {
         gamers: filterWaitingUsers(result.gamers)
@@ -365,7 +361,8 @@ function getQuestionnaireForGamer(gamer, questionnaires, categories) {
 }
 
 function removeEmptyMessages(messages) {
-  return messages.filter(m => !!m);
+  let a = messages.filter(m => !!m);
+  return Promise.resolve(a);
 }
 
 function decorateMessagesOpts(messages = []) {
@@ -447,7 +444,7 @@ function processUserData(user, msg) {
       user.stack = STACK[answerIndex - 1];
       setNextStatus(user);
       let message = {};
-      updateUser(user)
+      return updateUser(user)
         .then(_ => {
           message = {
             id: telegramId,
@@ -458,12 +455,12 @@ function processUserData(user, msg) {
         .catch(err => {
           message = {
             id: telegramId,
-            msg: `ERROR`
+            msg: `Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.`
           };
           reject(message);
         })
     } else {
-      handleUserAnswer(user, msg);
+      resolve(handleUserAnswer(user, msg));
     }
   });
 }

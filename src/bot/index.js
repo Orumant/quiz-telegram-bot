@@ -22,6 +22,9 @@ const bot = new TelegramBot(TOKEN, {polling: true});
 //   certificate: options.webHook.cert
 // });
 
+module.exports = {
+  bot,
+};
 const logger = require("./logger");
 
 const Queue = require("./queue");
@@ -49,7 +52,9 @@ initQuestions();
 
 bot.onText(/\/clear/, msg => {
   logger.info("command /clear %s", msg);
-  clearUserProfile(msg).then(({id, msg}) => sendMessage(id, msg));
+  clearUserProfile(msg)
+    .then(({id, msg}) => sendMessage(id, msg))
+    .catch(({id, msg}) => sendMessage(id, msg))
 });
 
 bot.onText(/\/help/, msg => {
@@ -78,18 +83,21 @@ bot.onText(/^\/start$/, incomeMsg => {
 setInterval(() => {
   if (isTestAvailableByTime()) {
     queryData()
-      .then(processUsersWithNoInfo)
-      .then(messages =>
-        messages.map(({id, msg, opts}) => {
-          sendMessage(id, msg, opts);
-      }));
-    processWaitingUsers()
-      .then(messages =>
+      .then(data => processUsersWithNoInfo(data))
+      .then(messages => {
         messages.map(({id, msg, opts}) => {
           sendMessage(id, msg, opts);
         })
-      )
+      })
       .catch(err => logger.error(err));
+    queryData()
+      .then(data => processWaitingUsers(data))
+      .then(messages => {
+        messages.map(({id, msg, opts}) => {
+          sendMessage(id, msg, opts);
+        })
+      })
+      .catch(err => logger.error(err))
   }
 }, 2000);
 
@@ -130,7 +138,9 @@ queue.addCallback(sendMessageFromQueue);
 function sendMessageFromQueue({id, msg, opts}) {
   return bot
     .sendMessage(id, msg, opts)
-    .then(_ => logger.info("Success send to gamer=%s, msg=%s", id, msg))
+    .then(_ => {
+      logger.info("Success send to gamer=%s, msg=%s", id, msg)
+    })
     .catch(err => {
       logger.error("Error with send to gamer=%s, msg=%s. \n%s", id, msg, err);
     });

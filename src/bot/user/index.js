@@ -7,6 +7,7 @@ const WITH_QUESTIONS_STATUS = "with-question";
 const WAIT_QUESTION_STATUS = "wait-question";
 const FINISH_STATUS = "end";
 const DEFAULT_GAMER_NAME = "js-ниндзя";
+const MAX_TRY = require('config').get('bot.max_try');
 
 module.exports = {
   generateUser,
@@ -41,6 +42,8 @@ function generateUser(options = {}) {
     {
       stack: '',
       answers: [],
+      oldAnswers: [],
+      tryCount: 1,
       status: statuses[0],
       badgeName: null,
     },
@@ -49,9 +52,14 @@ function generateUser(options = {}) {
 }
 
 function clearUser(user = {}) {
+  if (user.oldAnswers)
+    user.oldAnswers.push(user.answers);
+  if (user.tryCount < MAX_TRY) {
+    user.tryCount += 1;
+  }
   return Object.assign(user, {
     answers: [],
-    status: NEW_STATUS
+    status: WAIT_QUESTION_STATUS,
   });
 }
 

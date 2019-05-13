@@ -16,6 +16,19 @@ const userSchema = new mongoose.Schema({
       category: String
     }
   ],
+  oldAnswers: [
+    [
+      {
+        questionnaireId: mongoose.Schema.Types.ObjectId,
+        isCorrect: Boolean,
+        value: String,
+        answeredAt: Date,
+        answered: Boolean,
+        category: String
+      }
+    ]
+  ],
+  tryCount: Number,
   stack: String,
   status: String
 });

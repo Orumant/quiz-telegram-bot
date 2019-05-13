@@ -26,7 +26,7 @@ function getQuestion(questionnaires = [], categories = [], gamer = {}) {
     answers
   );
   //Вопросы, на которые пользователь ответил
-  const answered = questionnairesByAnswered(questionnaires, answers);
+  const answered = questionnairesByAnswered(themedQuestionnaires, answers);
 
   //количество вопросов в категории
   const countFromAnsweredMap = countOfAnswersByCategoryMap(answered);
