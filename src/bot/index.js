@@ -3,7 +3,6 @@ const TelegramBot = require("node-telegram-bot-api");
 const config = require("config");
 const {isTestAvailableByTime} = require("./game/dateutils");
 const TOKEN = config.get("telegramBotToken");
-const IS_MOBIUS = config.get("isMobius");
 const url = config.get("url");
 const bot_server = config.get("bot_server");
 const MASTER_CHANNEL_ID = config.get('bot.masterChannelId');
@@ -29,6 +28,7 @@ module.exports = {
 const logger = require("./logger");
 
 const Queue = require("./queue");
+const {usersByTryes} = require("../statistics/mobius");
 const queue = new Queue(20, 1000);
 
 const {initQuestions} = require("../database");
@@ -61,6 +61,10 @@ bot.on('photo', (message) => {
     .then(message => sendMessageFromQueue(message))
     .catch(({id, msg}) => sendMessage(id, msg));
 });
+
+// bot.onText(/\/doit/, ({chat: {id}}) => {
+//   usersByTryes()
+// });
 
 bot.onText(/\/clear/, msg => {
   logger.info("command /clear %s", msg);
