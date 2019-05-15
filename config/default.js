@@ -6,6 +6,7 @@ module.exports = {
     dbName: "quiz_db"
   },
   bot: {
+    masterChannelId: '<insert id into development.json>',
     logDest: `${process.cwd()}/logs/bot`,
     max_try: 3,
     sf_link: "https://github.com/Orumant/quiz-telegram-bot",

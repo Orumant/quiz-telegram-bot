@@ -6,6 +6,7 @@ const TOKEN = config.get("telegramBotToken");
 const IS_MOBIUS = config.get("isMobius");
 const url = config.get("url");
 const bot_server = config.get("bot_server");
+const MASTER_CHANNEL_ID = config.get('bot.masterChannelId');
 const {port, key, cert} = bot_server;
 const R = require("ramda");
 const options = {
@@ -23,7 +24,7 @@ const bot = new TelegramBot(TOKEN, {polling: true});
 // });
 
 module.exports = {
-  bot,
+  sendMessageToChannel,
 };
 const logger = require("./logger");
 
@@ -49,6 +50,17 @@ const {
 } = require("./game/actions");
 
 initQuestions();
+
+bot.on('photo', (message) => {
+  logger.info("Callback %s", message);
+
+  checkForExistingUser(message)
+    .then(user => processUserBadgeName(user, message))
+    .then(stopEmptyMessage)
+    .catch(logger.error)
+    .then(message => sendMessageFromQueue(message))
+    .catch(({id, msg}) => sendMessage(id, msg));
+});
 
 bot.onText(/\/clear/, msg => {
   logger.info("command /clear %s", msg);
@@ -116,16 +128,16 @@ bot.on("callback_query", callbackQuery => {
     .catch(({id, msg}) => sendMessage(id, msg));
 });
 
-bot.onText(/^[^\/]/, (message) => {
-  logger.info("Callback %s", message);
-
-  checkForExistingUser(message)
-    .then(user => processUserBadgeName(user, message))
-    .then(stopEmptyMessage)
-    .catch(logger.error)
-    .then(message => sendMessageFromQueue(message))
-    .catch(({id, msg}) => sendMessage(id, msg));
-});
+// bot.onText(/^[^\/]/, (message) => {
+//   logger.info("Callback %s", message);
+//
+//   checkForExistingUser(message)
+//     .then(user => processUserBadgeName(user, message))
+//     .then(stopEmptyMessage)
+//     .catch(logger.error)
+//     .then(message => sendMessageFromQueue(message))
+//     .catch(({id, msg}) => sendMessage(id, msg));
+// });
 
 bot.on("polling_error", err => logger.error(err));
 bot.on("webhook_error", error => {
@@ -156,3 +168,7 @@ function sendMessage(id, msg, opts) {
 
 require("./server").start(sendMessage);
 queue.start();
+
+function sendMessageToChannel({photo_id, message}) {
+  bot.sendPhoto(MASTER_CHANNEL_ID, photo_id, {caption: message});
+}

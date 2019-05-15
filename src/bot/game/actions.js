@@ -115,7 +115,7 @@ function clearUserProfile(msg) {
         }
       })
       .catch(err => {
-        console.log(err);
+        logger.error(err);
         return reject({
           id: telegramId,
           msg: `Произошла ошибка при поиске вашего профиля.\nПожалуйста, обратитесь на стойку Сбербанка.`
@@ -193,27 +193,36 @@ function handleUserAnswer(user, msg) {
                     telegramId,
                     updatedUser
                   );
-                  const {answers = []} = user;
-                  //Чтобы не вычитывать пользователя из БД и т.к. в user.answers на данном этапе хранится на один вопрос
-                  //меньше, чем реально отвечено, а ответ на последний вопрос находится в newAnswer в isCorrect, то добавляем доп. проверку
-                  const score =
-                    countCorrectAnswers(answers) + (isCorrect ? 1 : 0);
-                  let scoreMsg = ``;
-                  // if (score == SIMPLE_PRIZE_SCORE && isCorrect) {
-                  //   scoreMsg +=
-                  //     "\n\nВы набрали балл, достаточный для получения подарка. Покажите это сообщение сотрудникам на стойке Сбертеха и получите его.\nПродолжайте участвовать и вы сможете получить более крутые призы!";
-                  // }
-                  if (isTestAvailableByTime()) {
-                    resolve({
-                      id: telegramId,
-                      msg: `Ответ принят, спасибо! Следующее обновление придет автоматически.`
+                  const {answers = [], stack = ''} = user;
+
+                  getAllCategories()
+                    .then(categories => {
+                      const questionsNumber = categories.reduce((sum, category) => {
+                        if (IS_MOBIUS){
+                          return category.title === stack ? sum + category.numberOfRequiredAnswers : sum;
+                        } else {
+                          return sum + category.numberOfRequiredAnswers;
+                        }
+                      }, 0);
+                      if (isTestAvailableByTime()) {
+                        resolve({
+                          id: telegramId,
+                          msg: `<b>Прогресс: ${answers.length}/${questionsNumber}</b>\nОтвет принят, спасибо! Следующее обновление придет автоматически.`,
+                          opts: {
+                            parse_mode: "html"
+                          }
+                        });
+                      } else {
+                        resolve({
+                          id: telegramId,
+                          msg: `Ответ принят, спасибо!.\nК сожалению, бот активен только во время конференции, сейчас он недоступен.`
+                        });
+                      }
+
+                    })
+                    .catch(err => {
+
                     });
-                  } else {
-                    resolve({
-                      id: telegramId,
-                      msg: `Ответ принят, спасибо!.\nК сожалению, бот активен только во время конференции, сейчас он недоступен.`
-                    });
-                  }
                 })
                 .catch(err => {
                   logger.info(err);
@@ -295,7 +304,7 @@ function processUsersWithNoInfo(data) {
         setNextStatus(gamer);
         message = {
           id,
-          msg: 'Как к Вам обращаться? Пожалуйста, укажите имя, которое написано у Вас на бэйдже.'
+          msg: 'Пожалуйста, сфотографируйте свой бейдж и отправьте фото сюда.'
         };
       } else {
         if (IS_MOBIUS && stack === "" && status === WITH_NAME) {
@@ -304,10 +313,10 @@ function processUsersWithNoInfo(data) {
         } else {
           if (status === WITH_STACK || (!IS_MOBIUS && ([WITH_NAME, WAIT_STACK].includes(status)))) {
             setNextStatus(gamer);
-            if(status === WITH_STACK) {
+            if (status === WITH_STACK) {
               message = {
                 id,
-                msg: 'Спасибо! В скором времени вам будет отправлен первый вопрос.'
+                msg: 'В скором времени вам будет отправлен первый вопрос.'
               }
             }
           }
@@ -410,17 +419,15 @@ function stopEmptyMessage(message = {}) {
 
 function processUserBadgeName(user, msg) {
   const {telegramId} = parseMsg(msg);
+  const photoId = msg.photo[3].file_id;
   return new Promise((resolve, reject) => {
-    const answer = msg.text;
-
     if (user.badgeName == null && user.status === WAIT_NAME) {
-      console.log(answer);
-      user.badgeName = answer;
+      user.badgeName = photoId;
       updateUser(setNextStatus(user))
         .then(_ => {
           resolve({
             id: telegramId,
-            msg: `Здравствуйте, ${answer}!`
+            msg: `Спасибо!`
           })
         })
         .catch(err => {
