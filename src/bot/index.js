@@ -28,7 +28,7 @@ module.exports = {
 const logger = require("./logger");
 
 const Queue = require("./queue");
-const {usersByTryes} = require("../statistics/mobius");
+// const {usersByTryes} = require("../statistics/mobius");
 const queue = new Queue(20, 1000);
 
 const {initQuestions} = require("../database");
