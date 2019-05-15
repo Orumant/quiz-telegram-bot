@@ -420,7 +420,7 @@ function stopEmptyMessage(message = {}) {
 
 function processUserBadgeName(user, msg) {
   const {telegramId} = parseMsg(msg);
-  const photoId = msg.photo[3].file_id;
+  const photoId = msg.photo[msg.photo.length - 1].file_id;
   return new Promise((resolve, reject) => {
     if (user.badgeName == null && user.status === WAIT_NAME) {
       user.badgeName = photoId;
