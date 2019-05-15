@@ -6,11 +6,14 @@ module.exports = {
     dbName: "quiz_db"
   },
   bot: {
+    masterChannelId: '<insert id into development.json>',
     logDest: `${process.cwd()}/logs/bot`,
+    max_try: 3,
+    sf_link: "https://github.com/Orumant/quiz-telegram-bot",
     openTime: "00:00",
     closeTime: "23:59",
-    simple_prize_score: 5,
-    lottery_score: 10
+    simple_prize_score: 1,
+    lottery_score: 2
   },
   bot_server: {
     logDest: `${process.cwd()}/logs/server`,
@@ -18,7 +21,7 @@ module.exports = {
     key: `${__dirname}/../../certs/webhook_pkey.pem`,
     cert: `${__dirname}/../../certs/webhook_cert.pem`
   },
-
+  isMobius: true,
   api_server: {
     logDest: `${process.cwd()}/logs/api`,
     port: process.env.PORT || 3000

@@ -7,6 +7,8 @@ const {
   countOfNeedsAnswersByCategoryMap,
   allowableQuestionnairesByAnswers
 } = require("./helpers");
+const config = require('config');
+const IS_MOBIUS = config.get("isMobius");
 
 module.exports = {
   getQuestion
@@ -14,18 +16,27 @@ module.exports = {
 
 function getQuestion(questionnaires = [], categories = [], gamer = {}) {
   const answers = gamer.answers;
+  //вопросы, на которые пользователь еще не отвечал
+  let themedQuestionnaires = questionnaires;
+  if (IS_MOBIUS) {
+    themedQuestionnaires = questionnaires.filter(question => question.category === gamer.stack)
+  }
   const allowableQuestionnaires = allowableQuestionnairesByAnswers(
-    questionnaires,
+    themedQuestionnaires,
     answers
   );
-  const answered = questionnairesByAnswered(questionnaires, answers);
+  //Вопросы, на которые пользователь ответил
+  const answered = questionnairesByAnswered(themedQuestionnaires, answers);
+
+  //количество вопросов в категории
   const countFromAnsweredMap = countOfAnswersByCategoryMap(answered);
+  //количество вопросов на которые нужно ответить в категории
   const countOfNeedsMap = countOfNeedsAnswersByCategoryMap(categories);
 
   let sumAnswersFromMap = R.compose(R.sum, Array.from);
-
+  //количество вопросов, на которые нужно ответить чтобы пройти тестирование
   let sumOfNeedsAnswers = sumAnswersFromMap(countOfNeedsMap.values());
-
+  //количество вопросов
   let sumOfAnswered = sumAnswersFromMap(countFromAnsweredMap.values());
 
   if (sumOfAnswered >= sumOfNeedsAnswers) {

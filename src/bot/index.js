@@ -1,11 +1,14 @@
+const {renderStackQuestion} = require("./messages");
 const TelegramBot = require("node-telegram-bot-api");
 const config = require("config");
-const { isTestAvailableByTime } = require("./game/dateutils");
+const {isTestAvailableByTime} = require("./game/dateutils");
 const TOKEN = config.get("telegramBotToken");
+const IS_MOBIUS = config.get("isMobius");
 const url = config.get("url");
 const bot_server = config.get("bot_server");
-const { port, key, cert } = bot_server;
-
+const MASTER_CHANNEL_ID = config.get('bot.masterChannelId');
+const {port, key, cert} = bot_server;
+const R = require("ramda");
 const options = {
   webHook: {
     port,
@@ -14,20 +17,23 @@ const options = {
   }
 };
 
-// const bot = new TelegramBot(TOKEN, { polling: true });
-const bot = new TelegramBot(TOKEN, options);
-bot.setWebHook(`${url}/bot${TOKEN}`, {
-  certificate: options.webHook.cert
-});
+const bot = new TelegramBot(TOKEN, {polling: true});
+// const bot = new TelegramBot(TOKEN, options);
+// bot.setWebHook(`${url}/bot${TOKEN}`, {
+//   certificate: options.webHook.cert
+// });
 
+module.exports = {
+  sendMessageToChannel,
+};
 const logger = require("./logger");
 
 const Queue = require("./queue");
 const queue = new Queue(20, 1000);
 
-const { initQuestions } = require("../database");
-const { renderHelp } = require("./messages");
-const { parseMsg } = require("./messages/parsers");
+const {initQuestions} = require("../database");
+const {renderHelp} = require("./messages");
+const {parseMsg} = require("./messages/parsers");
 
 const {
   handleUserAnswer,
@@ -36,32 +42,49 @@ const {
   processWaitingUsers,
   clearUserProfile,
   handleStartForAlreadyExistsGamer,
-  stopEmptyMessage
+  stopEmptyMessage,
+  processUserData,
+  processUsersWithNoInfo,
+  queryData,
+  processUserBadgeName,
 } = require("./game/actions");
 
 initQuestions();
 
+bot.on('photo', (message) => {
+  logger.info("Callback %s", message);
+
+  checkForExistingUser(message)
+    .then(user => processUserBadgeName(user, message))
+    .then(stopEmptyMessage)
+    .catch(logger.error)
+    .then(message => sendMessageFromQueue(message))
+    .catch(({id, msg}) => sendMessage(id, msg));
+});
+
 bot.onText(/\/clear/, msg => {
   logger.info("command /clear %s", msg);
-  clearUserProfile(msg).then(({ id, msg }) => sendMessage(id, msg));
+  clearUserProfile(msg)
+    .then(({id, msg}) => sendMessage(id, msg))
+    .catch(({id, msg}) => sendMessage(id, msg))
 });
 
 bot.onText(/\/help/, msg => {
   logger.info("command /help %s", msg);
-  const { telegramId } = parseMsg(msg);
-  sendMessage(telegramId, renderHelp(), { parse_mode: "HTML" });
+  const {telegramId} = parseMsg(msg);
+  sendMessage(telegramId, renderHelp(), {parse_mode: "HTML"});
 });
 
-bot.onText(/\/start/, incomeMsg => {
+bot.onText(/^\/start$/, incomeMsg => {
   if (isTestAvailableByTime()) {
     logger.info("command /start %s", incomeMsg);
     checkForExistingUser(incomeMsg)
       .then(handleStartForAlreadyExistsGamer)
       .catch(_ => startQuiz(incomeMsg))
-      .then(({ id, msg, opts }) => sendMessage(id, msg, opts))
-      .catch(({ id, msg }) => sendMessage(id, msg));
+      .then(({id, msg, opts}) => sendMessageFromQueue({id, msg, opts}))
+      .catch(({id, msg}) => sendMessage(id, msg));
   } else {
-    const { chat: { id } } = incomeMsg;
+    const {chat: {id}} = incomeMsg;
     sendMessage(
       id,
       "Извините, сейчас бот недоступен. Время работы бота совпадает со временем проведения конференции."
@@ -71,13 +94,22 @@ bot.onText(/\/start/, incomeMsg => {
 
 setInterval(() => {
   if (isTestAvailableByTime()) {
-    processWaitingUsers()
-      .then(messages =>
-        messages.map(({ id, msg, opts }) => {
+    queryData()
+      .then(data => processUsersWithNoInfo(data))
+      .then(messages => {
+        messages.map(({id, msg, opts}) => {
           sendMessage(id, msg, opts);
         })
-      )
+      })
       .catch(err => logger.error(err));
+    queryData()
+      .then(data => processWaitingUsers(data))
+      .then(messages => {
+        messages.map(({id, msg, opts}) => {
+          sendMessage(id, msg, opts);
+        })
+      })
+      .catch(err => logger.error(err))
   }
 }, 2000);
 
@@ -89,12 +121,23 @@ bot.on("callback_query", callbackQuery => {
   logger.info("Callback %s", msg);
 
   checkForExistingUser(msg)
-    .then(user => handleUserAnswer(user, msg))
+    .then(user => processUserData(user, msg))
     .then(stopEmptyMessage)
     .catch(logger.error)
     .then(message => sendMessageFromQueue(message))
-    .catch(({ id, msg }) => sendMessage(id, msg));
+    .catch(({id, msg}) => sendMessage(id, msg));
 });
+
+// bot.onText(/^[^\/]/, (message) => {
+//   logger.info("Callback %s", message);
+//
+//   checkForExistingUser(message)
+//     .then(user => processUserBadgeName(user, message))
+//     .then(stopEmptyMessage)
+//     .catch(logger.error)
+//     .then(message => sendMessageFromQueue(message))
+//     .catch(({id, msg}) => sendMessage(id, msg));
+// });
 
 bot.on("polling_error", err => logger.error(err));
 bot.on("webhook_error", error => {
@@ -104,10 +147,12 @@ bot.on("webhook_error", error => {
 
 queue.addCallback(sendMessageFromQueue);
 
-function sendMessageFromQueue({ id, msg, opts }) {
+function sendMessageFromQueue({id, msg, opts}) {
   return bot
     .sendMessage(id, msg, opts)
-    .then(_ => logger.info("Success send to gamer=%s, msg=%s", id, msg))
+    .then(_ => {
+      logger.info("Success send to gamer=%s, msg=%s", id, msg)
+    })
     .catch(err => {
       logger.error("Error with send to gamer=%s, msg=%s. \n%s", id, msg, err);
     });
@@ -123,3 +168,7 @@ function sendMessage(id, msg, opts) {
 
 require("./server").start(sendMessage);
 queue.start();
+
+function sendMessageToChannel({photo_id, message}) {
+  bot.sendPhoto(MASTER_CHANNEL_ID, photo_id, {caption: message});
+}

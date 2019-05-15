@@ -1,9 +1,13 @@
-const { isTestAvailableByTime } = require("./dateutils");
+const {isTestAvailableByTime} = require("./dateutils");
 const R = require("ramda");
-const { makeGamerAnswer, alreadyAnswered } = require("../user/answers");
-const { getQuestion } = require("../questionnaires");
-const { WITH_QUESTIONS_STATUS, FINISH_STATUS } = require("../user");
+const {makeGamerAnswer, alreadyAnswered} = require("../user/answers");
+const {getQuestion} = require("../questionnaires");
+const {WITH_QUESTIONS_STATUS, NEW_STATUS, WAIT_STACK, WITH_STACK, WAIT_NAME, WITH_NAME, FINISH_STATUS} = require("../user");
 const logger = require("../logger");
+const IOS = 'ios';
+const ANDROID = 'android';
+
+const STACK = [IOS, ANDROID];
 
 const {
   updateUser,
@@ -26,8 +30,8 @@ const {
 } = require("../user");
 const compareAnswer = require("../compare-answer");
 
-const { parseMsg } = require("../messages/parsers");
-const { generateOpts, generateMessage } = require("../messages");
+const {parseMsg} = require("../messages/parsers");
+const {generateOpts, generateMessage} = require("../messages");
 
 const {
   processNoQuestionnaireForGamer,
@@ -37,9 +41,10 @@ const {
   generatePayload
 } = require("./pipes");
 
-const { countCorrectAnswers } = require("./helpers");
+const {countCorrectAnswers} = require("./helpers");
 const config = require("config");
 const SIMPLE_PRIZE_SCORE = config.get("bot.simple_prize_score");
+const IS_MOBIUS = config.get("isMobius");
 
 module.exports = {
   destroyUserProfile,
@@ -53,11 +58,15 @@ module.exports = {
   processHasQuestionnaireForGamer,
   clearUserProfile,
   stopEmptyMessage,
-  handleStartForAlreadyExistsGamer
+  processUserData,
+  handleStartForAlreadyExistsGamer,
+  processUsersWithNoInfo,
+  queryData,
+  processUserBadgeName,
 };
 
 function destroyUserProfile(msg) {
-  const { userId, telegramId, name } = parseMsg(msg);
+  const {userId, telegramId, name} = parseMsg(msg);
 
   return new Promise(resolve =>
     deleteUser(userId)
@@ -79,7 +88,7 @@ function destroyUserProfile(msg) {
 }
 
 function clearUserProfile(msg) {
-  const { telegramId } = parseMsg(msg);
+  const {telegramId} = parseMsg(msg);
 
   return new Promise((resolve, reject) =>
     getUserById(telegramId)
@@ -87,29 +96,36 @@ function clearUserProfile(msg) {
         if (!user || !user.length) {
           reject();
         }
-        const clearedUser = clearUser(user[0]);
-        return updateUser(clearedUser)
-          .then(
-            resolve({
-              id: telegramId,
-              msg:
-                "История ваших ответов очищена. Тестирование начнется сначала. Обновление придет автоматически"
-            })
-          )
-          .catch(reject);
+        if (user[0].tryCount === 3) {
+          return reject({
+            id: telegramId,
+            msg: 'Увы, вы исчерпали все попытки.'
+          })
+        } else {
+          const clearedUser = clearUser(user[0]);
+          return updateUser(clearedUser)
+            .then(
+              resolve({
+                id: telegramId,
+                msg:
+                  "Тестирование начнется сначала. Обновление придет автоматически"
+              })
+            )
+            .catch(reject);
+        }
       })
       .catch(err => {
-        console.log(err);
+        logger.error(err);
         return reject({
           id: telegramId,
-          msg: `Произошла ошибка при поиске вашего профиля.\nПожалуйста, очистите профиль /clear.\nИ после этого анкетирование перезапустится автоматически.`
+          msg: `Произошла ошибка при поиске вашего профиля.\nПожалуйста, обратитесь на стойку Сбербанка.`
         });
       })
   );
 }
 
 function checkForExistingUser(msg) {
-  const { userId, telegramId } = parseMsg(msg);
+  const {userId, telegramId} = parseMsg(msg);
   return new Promise((resolve, reject) =>
     getUserById(userId)
       .then(user => {
@@ -133,7 +149,7 @@ function checkForExistingUser(msg) {
 }
 
 function handleUserAnswer(user, msg) {
-  const { telegramId } = parseMsg(msg);
+  const {telegramId} = parseMsg(msg);
   return new Promise((resolve, reject) => {
     const answer = msg.text;
     const questionId = answer.match(/(\w+)--/)[1];
@@ -177,34 +193,43 @@ function handleUserAnswer(user, msg) {
                     telegramId,
                     updatedUser
                   );
-                  const { answers = [] } = user;
-                  //Чтобы не вычитывать пользователя из БД и т.к. в user.answers на данном этапе хранится на один вопрос
-                  //меньше, чем реально отвечено, а ответ на последний вопрос находится в newAnswer в isCorrect, то добавляем доп. проверку
-                  const score =
-                    countCorrectAnswers(answers) + (isCorrect ? 1 : 0);
-                  let scoreMsg = "";
-                  if (score == SIMPLE_PRIZE_SCORE && isCorrect) {
-                    scoreMsg +=
-                      "\n\nВы набрали балл, достаточный для получения подарка. Покажите это сообщение сотрудникам на стойке Сбертеха и получите его.\nПродолжайте участвовать и вы сможете получить более крутые призы!";
-                  }
-                  if (isTestAvailableByTime()) {
-                    resolve({
-                      id: telegramId,
-                      msg: `Ответ принят, спасибо! Следующее обновление придет автоматически.${scoreMsg}`
+                  const {answers = [], stack = ''} = user;
+
+                  getAllCategories()
+                    .then(categories => {
+                      const questionsNumber = categories.reduce((sum, category) => {
+                        if (IS_MOBIUS){
+                          return category.title === stack ? sum + category.numberOfRequiredAnswers : sum;
+                        } else {
+                          return sum + category.numberOfRequiredAnswers;
+                        }
+                      }, 0);
+                      if (isTestAvailableByTime()) {
+                        resolve({
+                          id: telegramId,
+                          msg: `<b>Прогресс: ${answers.length}/${questionsNumber}</b>\nОтвет принят, спасибо! Следующее обновление придет автоматически.`,
+                          opts: {
+                            parse_mode: "html"
+                          }
+                        });
+                      } else {
+                        resolve({
+                          id: telegramId,
+                          msg: `Ответ принят, спасибо!.\nК сожалению, бот активен только во время конференции, сейчас он недоступен.`
+                        });
+                      }
+
+                    })
+                    .catch(err => {
+
                     });
-                  } else {
-                    resolve({
-                      id: telegramId,
-                      msg: `Ответ принят, спасибо!.\nК сожалению, бот активен только во время конференции, сейчас он недоступен.${scoreMsg}`
-                    });
-                  }
                 })
                 .catch(err => {
                   logger.info(err);
                   reject({
                     id: telegramId,
                     msg:
-                      "Произошла ошибка. Обратитесь на стойку к сотрудникам Сбертеха."
+                      "Произошла ошибка. Обратитесь на стойку к сотрудникам Сбербанка."
                   });
                 });
             })
@@ -213,7 +238,7 @@ function handleUserAnswer(user, msg) {
               reject({
                 id: telegramId,
                 msg:
-                  "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбертеха."
+                  "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбербанка."
               });
             });
         })
@@ -221,7 +246,7 @@ function handleUserAnswer(user, msg) {
           logger.error(err);
           reject({
             id: telegramId,
-            msg: "Произошла ошибка. Обратитесь на стойку к hr."
+            msg: "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбербанк."
           });
         });
     }
@@ -229,7 +254,7 @@ function handleUserAnswer(user, msg) {
 }
 
 function startQuiz(msg) {
-  const { telegramId, userId, username, name, fio } = parseMsg(msg);
+  const {telegramId, userId, username, name, fio} = parseMsg(msg);
   return new Promise((resolve, reject) => {
     const newUser = generateUser({
       telegramId: telegramId,
@@ -243,7 +268,7 @@ function startQuiz(msg) {
       .then(_ => {
         resolve({
           id: telegramId,
-          msg: `Приветствую, ${name}! Вы добавлены в список участников.\nЧерез время вам будет выслан первый вопрос.`
+          msg: `Приветствую, ${name}! Вы добавлены в список участников.`
         });
       })
       .catch(err => {
@@ -257,19 +282,70 @@ function startQuiz(msg) {
   });
 }
 
-function getQuestinnairesForWaitingGamers() {
+function queryData() {
   return Promise.all([
     getAllUsers(),
     getAllQuestionnaires(),
     getAllCategories()
   ])
     .then(R.zipObj(["gamers", "questionnaires", "categories"]))
+}
+
+function processUsersWithNoInfo(data) {
+  const {gamers} = data;
+  const {renderStackQuestion} = require('../messages');
+  return new Promise((resolve, reject) => {
+    let unknownGamers = gamers.filter(gamer =>
+      [NEW_STATUS, WAIT_NAME, WITH_NAME, WITH_STACK, WAIT_STACK].includes(gamer.status));
+    let messages = unknownGamers.map(async gamer => {
+      let {id, badgeName, status, stack} = gamer;
+      let message = null;
+      if (!badgeName && status === NEW_STATUS) {
+        setNextStatus(gamer);
+        message = {
+          id,
+          msg: 'Пожалуйста, сфотографируйте свой бейдж и отправьте фото сюда.'
+        };
+      } else {
+        if (IS_MOBIUS && stack === "" && status === WITH_NAME) {
+          setNextStatus(gamer);
+          message = renderStackQuestion(id);
+        } else {
+          if (status === WITH_STACK || (!IS_MOBIUS && ([WITH_NAME, WAIT_STACK].includes(status)))) {
+            setNextStatus(gamer);
+            if (status === WITH_STACK) {
+              message = {
+                id,
+                msg: 'В скором времени вам будет отправлен первый вопрос.'
+              }
+            }
+          }
+        }
+      }
+      return updateUser(gamer)
+        .then(() => message)
+        .catch(err => {
+          logger.error(err);
+          return {
+            id,
+            msg: 'Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.'
+          }
+        })
+    });
+    Promise.all(messages)
+      .then(resolvedMessages => removeEmptyMessages(resolvedMessages))
+      .then(msg => resolve(msg))
+  })
+}
+
+function getQuestinnairesForWaitingGamers(data) {
+  return Promise.resolve(data)
     .then(result => {
       return Object.assign(result, {
         gamers: filterWaitingUsers(result.gamers)
       });
     })
-    .then(({ gamers = [], questionnaires = [], categories = [] }) => {
+    .then(({gamers = [], questionnaires = [], categories = []}) => {
       return Promise.all(
         gamers.map(gamer =>
           getQuestionnaireForGamer(gamer, questionnaires, categories)
@@ -294,7 +370,8 @@ function getQuestionnaireForGamer(gamer, questionnaires, categories) {
 }
 
 function removeEmptyMessages(messages) {
-  return messages.filter(m => !!m);
+  let a = messages.filter(m => !!m);
+  return Promise.resolve(a);
 }
 
 function decorateMessagesOpts(messages = []) {
@@ -338,4 +415,59 @@ function stopEmptyMessage(message = {}) {
   }
   logger.info("Gamer twice answer on questionnaire");
   throw new Error("Gamer twice answer on questionnaire");
+}
+
+function processUserBadgeName(user, msg) {
+  const {telegramId} = parseMsg(msg);
+  const photoId = msg.photo[3].file_id;
+  return new Promise((resolve, reject) => {
+    if (user.badgeName == null && user.status === WAIT_NAME) {
+      user.badgeName = photoId;
+      updateUser(setNextStatus(user))
+        .then(_ => {
+          resolve({
+            id: telegramId,
+            msg: `Спасибо!`
+          })
+        })
+        .catch(err => {
+          logger.error(err);
+          reject({
+            id: telegramId,
+            msg: `Произошла ошибка! Обратитесь на стойку Сбербанка.`
+          })
+        })
+    }
+  })
+}
+
+function processUserData(user, msg) {
+  const {telegramId} = parseMsg(msg);
+  return new Promise((resolve, reject) => {
+    const answer = msg.text;
+
+    if (IS_MOBIUS && R.equals(user.stack, "") && user.status === WAIT_STACK) {
+      const answerIndex = answer.match(/--(\d+)/)[1];
+      user.stack = STACK[answerIndex - 1];
+      setNextStatus(user);
+      let message = {};
+      return updateUser(user)
+        .then(_ => {
+          message = {
+            id: telegramId,
+            msg: `Спасибо! Вопросы по выбранному вами стеку будут присланы через некоторое время автоматически.`
+          };
+          resolve(message);
+        })
+        .catch(err => {
+          message = {
+            id: telegramId,
+            msg: `Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.`
+          };
+          reject(message);
+        })
+    } else {
+      resolve(handleUserAnswer(user, msg));
+    }
+  });
 }
