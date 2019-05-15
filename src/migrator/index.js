@@ -100,9 +100,7 @@ if (ops.filename) {
                   categories.map(category =>
                     createOrUpdateCategory({
                       title: category,
-                      numberOfRequiredAnswers: Math.floor(
-                        calcByCategory(category) / 2
-                      )
+                      numberOfRequiredAnswers: 1
                     }).then(cat =>
                       console.log(`Category ${cat.title} imported`)
                     )

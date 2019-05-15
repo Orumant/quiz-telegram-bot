@@ -1,6 +1,7 @@
 const config = require("config");
 const LOTTERY_SCORE = config.get("bot.lottery_score");
 const MAX_TRY = config.get("bot.max_try");
+const IS_MOBIUS = config.get("isMobius");
 const MAX_BUTTON_TEXT_SIZE = 33;
 module.exports = {
   renderQuestion,
@@ -107,7 +108,7 @@ function renderHelp() {
   return `
 <b>Сбербанк бот</b>
 
-Бот доступен во время проведения конференции HolyJS 2019 в Санкт-Петербурге.
+Бот доступен во время проведения конференции ${IS_MOBIUS ? 'Mobius 2019' : 'HolyJS 2019'} в Санкт-Петербурге.
 Он будет присылать вопросы по javascript и смежным технологиям. 
 Ваша задача - ответить на все вопросы.
 Чтобы получить наклейку, необходимо верно ответить на ${LOTTERY_SCORE} вопросов.

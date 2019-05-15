@@ -19,7 +19,8 @@ function getQuestion(questionnaires = [], categories = [], gamer = {}) {
   //вопросы, на которые пользователь еще не отвечал
   let themedQuestionnaires = questionnaires;
   if (IS_MOBIUS) {
-    themedQuestionnaires = questionnaires.filter(question => question.category === gamer.stack)
+    let regExp = new RegExp(`^${gamer.stack}`);
+    themedQuestionnaires = questionnaires.filter(question => regExp.test(question.category));
   }
   const allowableQuestionnaires = allowableQuestionnairesByAnswers(
     themedQuestionnaires,

@@ -13,7 +13,7 @@ module.exports = {
     openTime: "00:00",
     closeTime: "23:59",
     simple_prize_score: 1,
-    lottery_score: 2
+    lottery_score: 6
   },
   bot_server: {
     logDest: `${process.cwd()}/logs/server`,

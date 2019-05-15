@@ -4,7 +4,7 @@ const {makeGamerAnswer, alreadyAnswered} = require("../user/answers");
 const {getQuestion} = require("../questionnaires");
 const {WITH_QUESTIONS_STATUS, NEW_STATUS, WAIT_STACK, WITH_STACK, WAIT_NAME, WITH_NAME, FINISH_STATUS} = require("../user");
 const logger = require("../logger");
-const IOS = 'ios';
+const IOS = 'iOS';
 const ANDROID = 'android';
 
 const STACK = [IOS, ANDROID];
@@ -199,7 +199,8 @@ function handleUserAnswer(user, msg) {
                     .then(categories => {
                       const questionsNumber = categories.reduce((sum, category) => {
                         if (IS_MOBIUS){
-                          return category.title === stack ? sum + category.numberOfRequiredAnswers : sum;
+                          let regExp = new RegExp(`^${stack}`);
+                          return regExp.test(category.title) ? sum + category.numberOfRequiredAnswers : sum;
                         } else {
                           return sum + category.numberOfRequiredAnswers;
                         }
