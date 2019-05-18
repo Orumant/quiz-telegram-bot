@@ -64,7 +64,7 @@ bot.on('photo', (message) => {
 
 bot.onText(/\/restart/, (msg) => {
   destroyUserProfile(msg)
-    .then(sendMessage)
+    .then(({id, msg}) => sendMessage(id, msg));
 });
 
 bot.onText(/\/clear/, msg => {
