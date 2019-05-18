@@ -36,7 +36,7 @@ const {renderHelp} = require("./messages");
 const {parseMsg} = require("./messages/parsers");
 
 const {
-  handleUserAnswer,
+  destroyUserProfile,
   checkForExistingUser,
   startQuiz,
   processWaitingUsers,
@@ -67,6 +67,11 @@ bot.onText(/\/clear/, msg => {
   clearUserProfile(msg)
     .then(({id, msg}) => sendMessage(id, msg))
     .catch(({id, msg}) => sendMessage(id, msg))
+});
+
+bot.onText(/\/restart/, msg => {
+  destroyUserProfile(msg)
+    .then(({id, msg}) => sendMessage(id, msg))
 });
 
 bot.onText(/\/help/, msg => {
@@ -127,17 +132,6 @@ bot.on("callback_query", callbackQuery => {
     .then(message => sendMessageFromQueue(message))
     .catch(({id, msg}) => sendMessage(id, msg));
 });
-
-// bot.onText(/^[^\/]/, (message) => {
-//   logger.info("Callback %s", message);
-//
-//   checkForExistingUser(message)
-//     .then(user => processUserBadgeName(user, message))
-//     .then(stopEmptyMessage)
-//     .catch(logger.error)
-//     .then(message => sendMessageFromQueue(message))
-//     .catch(({id, msg}) => sendMessage(id, msg));
-// });
 
 bot.on("polling_error", err => logger.error(err));
 bot.on("webhook_error", error => {
