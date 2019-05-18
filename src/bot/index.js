@@ -36,7 +36,6 @@ const {renderHelp} = require("./messages");
 const {parseMsg} = require("./messages/parsers");
 
 const {
-  handleUserAnswer,
   checkForExistingUser,
   startQuiz,
   processWaitingUsers,
@@ -47,6 +46,7 @@ const {
   processUsersWithNoInfo,
   queryData,
   processUserBadgeName,
+  destroyUserProfile,
 } = require("./game/actions");
 
 initQuestions();
@@ -62,9 +62,10 @@ bot.on('photo', (message) => {
     .catch(({id, msg}) => sendMessage(id, msg));
 });
 
-// bot.onText(/\/doit/, ({chat: {id}}) => {
-//   usersByTryes()
-// });
+bot.onText(/\/restart/, (msg) => {
+  destroyUserProfile(msg)
+    .then(sendMessage)
+});
 
 bot.onText(/\/clear/, msg => {
   logger.info("command /clear %s", msg);
@@ -131,17 +132,6 @@ bot.on("callback_query", callbackQuery => {
     .then(message => sendMessageFromQueue(message))
     .catch(({id, msg}) => sendMessage(id, msg));
 });
-
-// bot.onText(/^[^\/]/, (message) => {
-//   logger.info("Callback %s", message);
-//
-//   checkForExistingUser(message)
-//     .then(user => processUserBadgeName(user, message))
-//     .then(stopEmptyMessage)
-//     .catch(logger.error)
-//     .then(message => sendMessageFromQueue(message))
-//     .catch(({id, msg}) => sendMessage(id, msg));
-// });
 
 bot.on("polling_error", err => logger.error(err));
 bot.on("webhook_error", error => {
