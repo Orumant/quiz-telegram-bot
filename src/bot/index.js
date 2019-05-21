@@ -28,7 +28,6 @@ module.exports = {
 const logger = require("./logger");
 
 const Queue = require("./queue");
-// const {usersByTryes} = require("../statistics/mobius");
 const queue = new Queue(20, 1000);
 
 const {initQuestions} = require("../database");
@@ -62,10 +61,10 @@ bot.on('photo', (message) => {
     .catch(({id, msg}) => sendMessage(id, msg));
 });
 
-bot.onText(/\/restart/, (msg) => {
-  destroyUserProfile(msg)
-    .then(({id, msg}) => sendMessage(id, msg));
-});
+// bot.onText(/\/restart/, (msg) => {
+//   destroyUserProfile(msg)
+//     .then(({id, msg}) => sendMessage(id, msg));
+// });
 
 bot.onText(/\/clear/, msg => {
   logger.info("command /clear %s", msg);
