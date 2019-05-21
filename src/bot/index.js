@@ -61,10 +61,10 @@ bot.on('photo', (message) => {
     .catch(({id, msg}) => sendMessage(id, msg));
 });
 
-// bot.onText(/\/restart/, (msg) => {
-//   destroyUserProfile(msg)
-//     .then(({id, msg}) => sendMessage(id, msg));
-// });
+bot.onText(/\/nestreliaysvoi/, (msg) => {
+  destroyUserProfile(msg)
+    .then(({id, msg}) => sendMessage(id, msg));
+});
 
 bot.onText(/\/clear/, msg => {
   logger.info("command /clear %s", msg);
