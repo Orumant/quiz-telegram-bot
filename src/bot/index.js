@@ -73,11 +73,11 @@ bot.onText(/\/clear/, msg => {
     .catch(({id, msg}) => sendMessage(id, msg))
 });
 
-bot.onText(/\/help/, msg => {
-  logger.info("command /help %s", msg);
-  const {telegramId} = parseMsg(msg);
-  sendMessage(telegramId, renderHelp(), {parse_mode: "HTML"});
-});
+// bot.onText(/\/help/, msg => {
+//   logger.info("command /help %s", msg);
+//   const {telegramId} = parseMsg(msg);
+//   sendMessage(telegramId, renderHelp(), {parse_mode: "HTML"});
+// });
 
 bot.onText(/^\/start$/, incomeMsg => {
   if (isTestAvailableByTime()) {

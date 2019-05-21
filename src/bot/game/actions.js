@@ -43,6 +43,7 @@ const {
 
 const {countCorrectAnswers} = require("./helpers");
 const config = require("config");
+const {renderHelp} = require("../messages");
 const SIMPLE_PRIZE_SCORE = config.get("bot.simple_prize_score");
 const IS_MOBIUS = config.get("isMobius");
 
@@ -269,7 +270,8 @@ function startQuiz(msg) {
       .then(_ => {
         resolve({
           id: telegramId,
-          msg: `Приветствую, ${name}! Вы добавлены в список участников.`
+          msg: renderHelp(),
+          opts: {parse_mode: "HTML"}
         });
       })
       .catch(err => {
