@@ -43,6 +43,7 @@ const {
 
 const {countCorrectAnswers} = require("./helpers");
 const config = require("config");
+const {renderHelp} = require("../messages");
 const SIMPLE_PRIZE_SCORE = config.get("bot.simple_prize_score");
 const IS_MOBIUS = config.get("isMobius");
 
@@ -99,7 +100,7 @@ function clearUserProfile(msg) {
         if (user[0].tryCount === 3) {
           return reject({
             id: telegramId,
-            msg: 'Увы, вы исчерпали все попытки.'
+            msg: 'Увы, ты исчерпал все попытки.'
           })
         } else {
           const clearedUser = clearUser(user[0]);
@@ -108,7 +109,7 @@ function clearUserProfile(msg) {
               resolve({
                 id: telegramId,
                 msg:
-                  "Тестирование начнется сначала. Обновление придет автоматически"
+                  "Испытание начнется сначала. Обновление придет автоматически"
               })
             )
             .catch(reject);
@@ -118,7 +119,7 @@ function clearUserProfile(msg) {
         logger.error(err);
         return reject({
           id: telegramId,
-          msg: `Произошла ошибка при поиске вашего профиля.\nПожалуйста, обратитесь на стойку Сбербанка.`
+          msg: `Произошла ошибка при поиске твоего профиля.\nПожалуйста, обратись на стойку Сбербанка.`
         });
       })
   );
@@ -133,7 +134,7 @@ function checkForExistingUser(msg) {
           reject({
             id: telegramId,
             msg:
-              "Вы не найдены в базе анкетирования. Отравьте /start, чтобы попасть в список участников"
+              "Ты не найден в базе испытания. Отравь /start, чтобы попасть в список участников"
           });
         }
         return resolve(user[0]);
@@ -229,7 +230,7 @@ function handleUserAnswer(user, msg) {
                   reject({
                     id: telegramId,
                     msg:
-                      "Произошла ошибка. Обратитесь на стойку к сотрудникам Сбербанка."
+                      "Произошла ошибка. Обратись на стойку к сотрудникам Сбербанка."
                   });
                 });
             })
@@ -238,7 +239,7 @@ function handleUserAnswer(user, msg) {
               reject({
                 id: telegramId,
                 msg:
-                  "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбербанка."
+                  "Произошла ошибка. Обратись на стойку к соткрудникам Сбербанка."
               });
             });
         })
@@ -246,7 +247,7 @@ function handleUserAnswer(user, msg) {
           logger.error(err);
           reject({
             id: telegramId,
-            msg: "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбербанк."
+            msg: "Произошла ошибка. Обратись на стойку к соткрудникам Сбербанк."
           });
         });
     }
@@ -268,7 +269,8 @@ function startQuiz(msg) {
       .then(_ => {
         resolve({
           id: telegramId,
-          msg: `Приветствую, ${name}! Вы добавлены в список участников.`
+          msg: renderHelp(username),
+          opts: {parse_mode: "HTML"},
         });
       })
       .catch(err => {
@@ -276,7 +278,7 @@ function startQuiz(msg) {
         reject({
           id: telegramId,
           msg:
-            "Произошла непредвиденная ошибка при начале теста с вами. Попробуйте еще раз."
+            "Произошла непредвиденная ошибка при начале теста с тобой. Попробуй еще раз."
         });
       });
   });
@@ -304,7 +306,7 @@ function processUsersWithNoInfo(data) {
         setNextStatus(gamer);
         message = {
           id,
-          msg: 'Пожалуйста, сфотографируйте свой бейдж и отправьте фото сюда.'
+          msg: 'Пожалуйста, сфотографируй свой бейдж, так чтобы я мог прочесть твое имя и пришли мне фото в ответ.'
         };
       } else {
         if (IS_MOBIUS && stack === "" && status === WITH_NAME) {
@@ -316,7 +318,7 @@ function processUsersWithNoInfo(data) {
             if (status === WITH_STACK) {
               message = {
                 id,
-                msg: 'В скором времени вам будет отправлен первый вопрос.'
+                msg: 'Начнем испытание!'
               }
             }
           }
@@ -328,7 +330,7 @@ function processUsersWithNoInfo(data) {
           logger.error(err);
           return {
             id,
-            msg: 'Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.'
+            msg: 'Возникла ошибка. Пожалуйста, обратись на стойку Сбербанка.'
           }
         })
     });
@@ -434,7 +436,7 @@ function processUserBadgeName(user, msg) {
           logger.error(err);
           reject({
             id: telegramId,
-            msg: `Произошла ошибка! Обратитесь на стойку Сбербанка.`
+            msg: `Произошла ошибка! Обратись на стойку Сбербанка.`
           })
         })
     }
