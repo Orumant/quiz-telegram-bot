@@ -319,7 +319,7 @@ function processUsersWithNoInfo(data) {
             if (status === WITH_STACK) {
               message = {
                 id,
-                msg: 'Начнем испытание!'
+                msg: 'В скором времени вам будет отправлен первый вопрос.'
               }
             }
           }
@@ -458,7 +458,7 @@ function processUserData(user, msg) {
         .then(_ => {
           message = {
             id: telegramId,
-            msg: `Спасибо! Вопросы по выбранному вами стеку будут присланы через некоторое время автоматически.`
+            msg: `Начнем испытание!`
           };
           resolve(message);
         })
