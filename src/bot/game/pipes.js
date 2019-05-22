@@ -112,7 +112,7 @@ function processUserEndStatus({user = {}, payload = {}}) {
       payload: Object.assign({}, payload, {
         id: user.telegramId,
         msg:
-          "Вы ответили на все вопросы, больше вопросы к вам не придут. Чтобы начать сначала, отправьте /clear"
+          "Ты ответил на все вопросы, больше вопросы к тебе не придут. Чтобы начать сначала, отправь /clear"
       })
     });
   }

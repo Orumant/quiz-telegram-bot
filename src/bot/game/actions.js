@@ -82,7 +82,7 @@ function destroyUserProfile(msg) {
         logger.error(err);
         resolve({
           id: telegramId,
-          msg: `Произошла ошибка. ${name} попробуйте еще раз.`
+          msg: `Произошла ошибка. ${name} попробуй еще раз.`
         });
       })
   );
@@ -119,7 +119,7 @@ function clearUserProfile(msg) {
         logger.error(err);
         return reject({
           id: telegramId,
-          msg: `Произошла ошибка при поиске вашего профиля.\nПожалуйста, обратитесь на стойку Сбербанка.`
+          msg: `Произошла ошибка при поиске твоего профиля.\nПожалуйста, обратись на стойку Сбербанка.`
         });
       })
   );
@@ -134,7 +134,7 @@ function checkForExistingUser(msg) {
           reject({
             id: telegramId,
             msg:
-              "Вы не найдены в базе анкетирования. Отравьте /start, чтобы попасть в список участников"
+              "Ты не найден в базе анкетирования. Отравь /start, чтобы попасть в список участников"
           });
         }
         return resolve(user[0]);
@@ -231,7 +231,7 @@ function handleUserAnswer(user, msg) {
                   reject({
                     id: telegramId,
                     msg:
-                      "Произошла ошибка. Обратитесь на стойку к сотрудникам Сбербанка."
+                      "Произошла ошибка. Обратись на стойку к сотрудникам Сбербанка."
                   });
                 });
             })
@@ -240,7 +240,7 @@ function handleUserAnswer(user, msg) {
               reject({
                 id: telegramId,
                 msg:
-                  "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбербанка."
+                  "Произошла ошибка. Обратись на стойку к соткрудникам Сбербанка."
               });
             });
         })
@@ -248,7 +248,7 @@ function handleUserAnswer(user, msg) {
           logger.error(err);
           reject({
             id: telegramId,
-            msg: "Произошла ошибка. Обратитесь на стойку к соткрудникам Сбербанк."
+            msg: "Произошла ошибка. Обратись на стойку к соткрудникам Сбербанк."
           });
         });
     }
@@ -279,7 +279,7 @@ function startQuiz(msg) {
         reject({
           id: telegramId,
           msg:
-            "Произошла непредвиденная ошибка при начале теста с вами. Попробуйте еще раз."
+            "Произошла непредвиденная ошибка при начале теста с тобой. Попробуй еще раз."
         });
       });
   });
@@ -319,7 +319,7 @@ function processUsersWithNoInfo(data) {
             if (status === WITH_STACK) {
               message = {
                 id,
-                msg: 'В скором времени вам будет отправлен первый вопрос.'
+                msg: 'В скором времени тебе будет отправлен первый вопрос.'
               }
             }
           }
@@ -331,7 +331,7 @@ function processUsersWithNoInfo(data) {
           logger.error(err);
           return {
             id,
-            msg: 'Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.'
+            msg: 'Возникла ошибка. Пожалуйста, обратись на стойку Сбербанка.'
           }
         })
     });
@@ -437,7 +437,7 @@ function processUserBadgeName(user, msg) {
           logger.error(err);
           reject({
             id: telegramId,
-            msg: `Произошла ошибка! Обратитесь на стойку Сбербанка.`
+            msg: `Произошла ошибка! Обратись на стойку Сбербанка.`
           })
         })
     }
@@ -465,7 +465,7 @@ function processUserData(user, msg) {
         .catch(err => {
           message = {
             id: telegramId,
-            msg: `Возникла ошибка. Пожалуйста, обратитесь на стойку Сбербанка.`
+            msg: `Возникла ошибка. Пожалуйста, обратись на стойку Сбербанка.`
           };
           reject(message);
         })
