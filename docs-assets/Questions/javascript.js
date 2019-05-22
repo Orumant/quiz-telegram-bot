@@ -55,7 +55,7 @@ module.exports = [
     "c": "js"
   },
   {
-    "q": "Что будет в переменной 'foo.bar'?\nconst bar = {}\nconst foo = {bar: bar\n}\n\ndelete foo.bar",
+    "q": "Что будет в переменной 'foo.bar'?\nconst bar = {}\nconst foo = {bar: bar}\n\ndelete foo.bar",
     "a": [
       "Вернется ошибка присвоения, поскольку 'bar' - константа",
       "{}",
