@@ -270,7 +270,7 @@ function startQuiz(msg) {
       .then(_ => {
         resolve({
           id: telegramId,
-          msg: renderHelp(),
+          msg: renderHelp(username),
           opts: {parse_mode: "HTML"}
         });
       })
@@ -307,7 +307,7 @@ function processUsersWithNoInfo(data) {
         setNextStatus(gamer);
         message = {
           id,
-          msg: 'Пожалуйста, сфотографируйте свой бейдж и отправьте фото сюда.'
+          msg: 'Пожалуйста, сфотографируй свой бейдж, так чтобы я мог прочесть твое имя и пришли мне фото в ответ.'
         };
       } else {
         if (IS_MOBIUS && stack === "" && status === WITH_NAME) {
@@ -319,7 +319,7 @@ function processUsersWithNoInfo(data) {
             if (status === WITH_STACK) {
               message = {
                 id,
-                msg: 'В скором времени вам будет отправлен первый вопрос.'
+                msg: 'Начнем испытание!'
               }
             }
           }

@@ -96,17 +96,19 @@ function generateMessage({ id, msg, replies = [] }) {
 function renderStackQuestion(id) {
   return generateMessage({
     id,
-    msg: "Разработчиком для какой платформы вы являетесь",
+    msg: "Выбери профиль испытания:",
     replies: [
-      {id: 1, value: "Я разработчик iOS"},
-      {id: 2, value: "Я разработчик Android"}
+      {id: 1, value: "iOS-разработка"},
+      {id: 2, value: "Android-разработка"}
       ]
   });
 }
 
-function renderHelp() {
+function renderHelp(username) {
   let a = `
 <b>Featurenator</b>
+
+Привет ${username}
 
 Привет! Во время проведения конференции Mobius 2019 в Санкт-Петербурге, я помогу тебе заработать одну из «ачивок» для прохождения квеста.
 Для этого тебе нужно показать свои знания мобильной разработки в испытании Skill-control. 
