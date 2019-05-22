@@ -48,7 +48,7 @@ function processNoQuestionnaireForGamer(questionnaire = {}) {
           results.push(`${score}/${answers.length}`);
           sendResultMessage({username: gamer.username.length > 0 ? gamer.username : gamer.fio, badgeName: gamer.badgeName, results});
         } else {
-          sendResultMessage({username: gamer.username, badgeName: gamer.badgeName, results: [`${score}/${answers.length}`]});
+          sendResultMessage({username: gamer.username.length > 0 ? gamer.username : gamer.fio, badgeName: gamer.badgeName, results: [`${score}/${answers.length}`]});
         }
       } else {
         if (MAX_TRY > tryCount) {
